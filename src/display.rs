@@ -1,5 +1,4 @@
 use core::convert::Infallible;
-use core::fmt::Write;
 
 use embedded_hal::digital::v2::OutputPin;
 
@@ -24,7 +23,8 @@ where
     D6: OutputPin<Error = Infallible>,
     D7: OutputPin<Error = Infallible>,
 {
-    lcd: HD44780<Delay, FourBitBus<RS, EN, D4, D5, D6, D7>>,
+    lcd: HD44780<FourBitBus<RS, EN, D4, D5, D6, D7>>,
+    delay: Delay,
 }
 
 impl<RS, EN, D4, D5, D6, D7> Display<RS, EN, D4, D5, D6, D7>
@@ -36,30 +36,31 @@ where
     D6: OutputPin<Error = Infallible>,
     D7: OutputPin<Error = Infallible>,
 {
-    pub fn new(rs: RS, en: EN, d4: D4, d5: D5, d6: D6, d7: D7, delay: Delay) -> Self {
-        let mut lcd = HD44780::new_4bit(rs, en, d4, d5, d6, d7, delay);
-        lcd.reset();
-        lcd.clear();
+    pub fn new(rs: RS, en: EN, d4: D4, d5: D5, d6: D6, d7: D7, mut delay: Delay) -> Self {
+        let mut lcd = HD44780::new_4bit(rs, en, d4, d5, d6, d7, &mut delay).unwrap();
+        lcd.reset(&mut delay).unwrap();
+        lcd.clear(&mut delay).unwrap();
         lcd.set_display_mode(
             DisplayMode {
                 display: hd44780_driver::Display::On,
                 cursor_visibility: Cursor::Invisible,
                 cursor_blink: CursorBlink::Off,
-            }
-        );
-        Self {lcd}
+            },
+            &mut delay
+        ).unwrap();
+        Self {lcd, delay}
     }
 
     pub fn draw_date_time(&mut self, date_time: &ds3231::DateTime) {
         let hours_val = match date_time.hours() {
             ds3231::Hours::Am(v) => {
-                self.lcd.set_cursor_pos(10);
-                self.lcd.write_str("AM").unwrap();
+                self.lcd.set_cursor_pos(10, &mut self.delay).unwrap();
+                self.lcd.write_str("AM", &mut self.delay).unwrap();
                 v
             }
             ds3231::Hours::Pm(v) => {
-                self.lcd.set_cursor_pos(10);
-                self.lcd.write_str("PM").unwrap();
+                self.lcd.set_cursor_pos(10, &mut self.delay).unwrap();
+                self.lcd.write_str("PM", &mut self.delay).unwrap();
                 v
             }
             ds3231::Hours::H24(v) => v,
@@ -92,8 +93,8 @@ where
         s2 = sec.into();
         s.push_str(&s2).unwrap();
         s.push_str("  ").unwrap();
-        self.lcd.set_cursor_pos(0);
-        self.lcd.write_str(s.as_str()).unwrap();
+        self.lcd.set_cursor_pos(0, &mut self.delay).unwrap();
+        self.lcd.write_str(s.as_str(), &mut self.delay).unwrap();
     }
 
     fn draw_date(&mut self, y: u16, m: u8, d: u8) {
@@ -112,19 +113,19 @@ where
         }
         s2 = d.into();
         s.push_str(&s2).unwrap();
-        self.lcd.set_cursor_pos(40);
-        self.lcd.write_str(s.as_str()).unwrap();
+        self.lcd.set_cursor_pos(40, &mut self.delay).unwrap();
+        self.lcd.write_str(s.as_str(), &mut self.delay).unwrap();
     }
 
     fn draw_day_of_week(&mut self, day: Option<ds3231::DayOfWeek>) {
         const DAY_NAMES: [&'static str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-        self.lcd.set_cursor_pos(13);
+        self.lcd.set_cursor_pos(13, &mut self.delay).unwrap();
         match day {
             None => {
-                self.lcd.write_str("***").unwrap();
+                self.lcd.write_str("***", &mut self.delay).unwrap();
             }
             Some(day) => {
-                self.lcd.write_str(DAY_NAMES[day.idx() as usize]).unwrap();
+                self.lcd.write_str(DAY_NAMES[day.idx() as usize], &mut self.delay).unwrap();
             }
         }
     }
